@@ -1,30 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Configures the Camel Context-->
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
 
-<beans xmlns="http://www.springframework.org/schema/beans"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xsi:schemaLocation="
-       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
-       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+	<context:annotation-config />
+	<context:property-placeholder properties-ref="externalProperties" />
 
-  <camelContext xmlns="http://camel.apache.org/schema/spring">
-    <!-- here is a sample which processes the input files
-         (leaving them in place - see the 'noop' flag)
-         then performs content based routing on the message using XPath -->
-    <route>
-      <from uri="file:src/data?noop=true"/>
-      <choice>
-        <when>
-          <xpath>/person/city = 'London'</xpath>
-          <log message="UK message"/>
-          <to uri="file:target/messages/uk"/>
-        </when>
-        <otherwise>
-          <log message="Other message"/>
-          <to uri="file:target/messages/others"/>
-        </otherwise>
-      </choice>
-    </route>
-  </camelContext>
+	<bean id="externalProperties" class="org.springframework.beans.factory.config.PropertiesFactoryBean">
+		<property name="location" value="classpath:application.properties" />
+	</bean>
 
+	<bean id="properties" class="org.apache.camel.component.properties.PropertiesComponent">
+		<property name="initialProperties" ref="externalProperties" />
+	</bean>
+
+	<bean id="fileNameParser" class="com.brm.biz.FileNameParser" />
+
+	<bean id="inspectProcessor" class="com.brm.process.InspectProcessor" />
+	<bean id="runUtil" class="com.brm.util.RunUtil" />
+
+	<!-- setup zipkin tracer -->
+	<bean id="zipkinTracer" class="org.apache.camel.zipkin.ZipkinTracer">
+		<property name="serviceName" value="camel-building-loader" />
+		<property name="hostName" value="localhost" />
+		<property name="port" value="9410" />
+		<property name="rate" value="1.0" />
+	</bean>
+
+	<camelContext xmlns="http://camel.apache.org/schema/spring">
+		<dataFormats>
+			<bindy id="buildingInfoFormat" type="Csv" classType="com.brm.data.BuildingInfo" />
+		</dataFormats>
+
+		<!-- 도로명 주소 전체 로드 -->
+		<route id="allDownload" autoStartup="true">
+			<from uri="timer://downloader?repeatCount=1" />
+			<bean ref="fileNameParser" method="parse({{juso.all.url}})" />
+			<to uri="{{juso.all.url}}" />
+			<to uri="file:target/juso/all" />
+			<log message="${header.CamelFileName} is downloaded." />
+		</route>
+
+		<route id="allUnZip" autoStartup="true">
+			<from
+				uri="file:target/juso/all?
+							move=done&amp;
+							readLock=changed&amp;
+							readLockCheckInterval=10000&amp;
+							readLockTimeout=30000&amp;
+							noop=true" />
+			<toD uri="exec:unzip?args=target/juso/all/${header.CamelFileName} -d target/juso/all-unzipped" />
+			<log message="Unzip of ${header.CamelFileName} is done." />
+			<bean ref="runUtil" method="stop" />
+		</route>
+
+	</camelContext>
 </beans>

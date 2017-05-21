@@ -88,11 +88,6 @@
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpclient</artifactId>
 		</dependency>
-		<!--zipkin -->
-		<dependency>
-			<groupId>org.apache.camel</groupId>
-			<artifactId>camel-zipkin</artifactId>
-		</dependency>
 	</dependencies>
 
 	<build>

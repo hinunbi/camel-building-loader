@@ -21,14 +21,6 @@
 	<bean id="inspectProcessor" class="com.brm.process.InspectProcessor" />
 	<bean id="runUtil" class="com.brm.util.RunUtil" />
 
-	<!-- setup zipkin tracer -->
-	<bean id="zipkinTracer" class="org.apache.camel.zipkin.ZipkinTracer">
-		<property name="serviceName" value="camel-building-loader" />
-		<property name="hostName" value="localhost" />
-		<property name="port" value="9410" />
-		<property name="rate" value="1.0" />
-	</bean>
-
 	<camelContext xmlns="http://camel.apache.org/schema/spring">
 		<dataFormats>
 			<bindy id="buildingInfoFormat" type="Csv" classType="com.brm.data.BuildingInfo" />
